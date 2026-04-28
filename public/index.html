@@ -283,6 +283,17 @@ h1 {
 }
 .field:focus { border-color: var(--green); }
 .field::placeholder { color: var(--text3); font-style: italic; }
+.field--error { border-color: var(--red) !important; }
+
+.field-error-msg {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--red);
+  letter-spacing: 0.06em;
+  margin-top: -0.6rem;
+  margin-bottom: 0.75rem;
+  min-height: 1em;
+}
 
 textarea.field {
   height: 70px;
@@ -508,6 +519,22 @@ textarea.field {
   to { transform: translateY(105vh) rotate(540deg); opacity: 0; }
 }
 
+/* ERROR BANNER */
+#error-banner {
+  display: none;
+  background: rgba(248,113,113,0.08);
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  color: var(--red);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+#error-banner.show { display: block; }
+
 /* TOAST */
 #toast {
   position: fixed;
@@ -579,11 +606,14 @@ textarea.field {
     </div>
 
     <div class="name-label">Your Venmo Handle</div>
-    <input class="field" id="donor-name" placeholder="GaryFromOhio" style="margin-bottom:0.9rem;" maxlength="32">
+    <input class="field" id="donor-name" placeholder="GaryFromOhio" style="margin-bottom:0.4rem;" maxlength="32">
+    <div class="field-error-msg" id="name-error"></div>
 
     <div class="name-label">Memo (optional)</div>
-    <textarea class="field" id="memo" placeholder="what's this for..."></textarea>
+    <textarea class="field" id="memo" placeholder="what's this for..." style="margin-bottom:0.4rem;"></textarea>
+    <div class="field-error-msg" id="memo-error"></div>
 
+    <div id="error-banner"></div>
     <button class="donate-btn" id="donate-btn">🦅 Donate to America</button>
 
     <div class="impact" id="impact">Every dollar counts. Technically.</div>
@@ -688,6 +718,54 @@ document.getElementById('custom-amt').addEventListener('input', () => {
   selectedAmt = null;
 });
 
+// ── CLIENT-SIDE VALIDATION ──
+const CLIENT_XSS = /<[^>]*>|javascript:|data:|on\w+\s*=/i;
+const CLIENT_DANGEROUS = /(<script|union\s+select|drop\s+table)/i;
+// Basic profanity list for instant client feedback (server re-validates with obscenity)
+const CLIENT_PROFANITY = ['fuck','shit','cunt','nigger','faggot','bitch','asshole','bastard','whore'];
+
+function clientValidateText(str) {
+  if (CLIENT_XSS.test(str) || CLIENT_DANGEROUS.test(str)) return 'Contains disallowed content';
+  const lower = str.toLowerCase();
+  if (CLIENT_PROFANITY.some(w => lower.includes(w))) return 'Contains profanity';
+  return null;
+}
+
+function setFieldError(fieldId, errorId, msg) {
+  const field = document.getElementById(fieldId);
+  const errEl = document.getElementById(errorId);
+  if (msg) {
+    field.classList.add('field--error');
+    errEl.textContent = msg;
+  } else {
+    field.classList.remove('field--error');
+    errEl.textContent = '';
+  }
+  return !!msg;
+}
+
+document.getElementById('donor-name').addEventListener('blur', function() {
+  const v = this.value.trim();
+  if (v) setFieldError('donor-name', 'name-error', clientValidateText(v));
+});
+document.getElementById('donor-name').addEventListener('input', function() {
+  hideErrorBanner();
+  if (this.classList.contains('field--error')) {
+    setFieldError('donor-name', 'name-error', clientValidateText(this.value.trim()));
+  }
+});
+
+document.getElementById('memo').addEventListener('blur', function() {
+  const v = this.value.trim();
+  if (v) setFieldError('memo', 'memo-error', clientValidateText(v));
+});
+document.getElementById('memo').addEventListener('input', function() {
+  hideErrorBanner();
+  if (this.classList.contains('field--error')) {
+    setFieldError('memo', 'memo-error', clientValidateText(this.value.trim()));
+  }
+});
+
 // ── DONATE ──
 document.getElementById('donate-btn').addEventListener('click', async () => {
   if (isSubmitting) return;
@@ -700,6 +778,14 @@ document.getElementById('donate-btn').addEventListener('click', async () => {
   const rawName = document.getElementById('donor-name').value.trim();
   const name = rawName || NAMES[Math.floor(Math.random() * NAMES.length)];
   const memo = document.getElementById('memo').value.trim();
+
+  // Client-side validation before hitting the server
+  const nameInvalid = rawName ? setFieldError('donor-name', 'name-error', clientValidateText(rawName)) : false;
+  const memoInvalid = memo ? setFieldError('memo', 'memo-error', clientValidateText(memo)) : false;
+  if (nameInvalid || memoInvalid) {
+    showErrorBanner('Please fix the errors above before submitting.');
+    return;
+  }
 
   isSubmitting = true;
   const btn = document.getElementById('donate-btn');
@@ -714,7 +800,7 @@ document.getElementById('donate-btn').addEventListener('click', async () => {
     });
     const data = await resp.json();
     if (!resp.ok) {
-      showImpact('⚠ ' + (data.error || 'Submission failed.'), false);
+      showErrorBanner(data.error || 'Submission failed.');
       return;
     }
 
@@ -740,6 +826,7 @@ document.getElementById('donate-btn').addEventListener('click', async () => {
     lastShareText = `I just donated ${fmt(amount)} to the U.S. national debt 🦅 That's ${((amount/DEBT_BASE)*100).toExponential(2)}% paid off. Who's next? payitdownplease.com`;
 
     document.getElementById('memo').value = '';
+    hideErrorBanner();
     playDonate();
     loadLeaderboard();
   } catch (e) {
@@ -763,6 +850,17 @@ function showImpact(msg, good) {
   el.textContent = msg;
   el.classList.toggle('active', good);
   if (good) setTimeout(() => el.classList.remove('active'), 4000);
+}
+
+// ── ERROR BANNER ──
+function showErrorBanner(msg) {
+  const el = document.getElementById('error-banner');
+  el.textContent = '⚠ ' + msg;
+  el.classList.add('show');
+}
+
+function hideErrorBanner() {
+  document.getElementById('error-banner').classList.remove('show');
 }
 
 // ── CONFETTI ──
