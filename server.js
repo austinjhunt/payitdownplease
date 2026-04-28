@@ -5,6 +5,13 @@ const path = require('path');
 const fs = require('fs');
 const initSqlJs = require('sql.js');
 
+// Load fallback memos from flat file (300 entries)
+const FALLBACKS = require('fs')
+  .readFileSync(require('path').join(__dirname, 'fallbacks.txt'), 'utf8')
+  .split('\n')
+  .map(l => l.trim())
+  .filter(Boolean);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'donations.db');
@@ -130,21 +137,10 @@ app.post('/api/generate-memo', async (req, res) => {
 });
 
 async function generateMemo(amount) {
-  const fallbacks = [
-    'here ya go lmao',
-    'thoughts and prayers for the treasury 🙏',
-    'my therapist said this would help',
-    'in lieu of flowers',
-    'paying rent to live in this country',
-    'found this in my truck\'s cup holder',
-    'sry for my generation',
-    'this covers like 0.00000001 seconds of interest',
-    'i am definitely not being sarcastic',
-    'venmo me back if you get this',
-  ];
+  const randFallback = () => FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+    return randFallback();
   }
 
   try {
@@ -165,9 +161,9 @@ async function generateMemo(amount) {
       })
     });
     const data = await resp.json();
-    return data.content?.[0]?.text?.trim() || fallbacks[0];
+    return data.content?.[0]?.text?.trim() || randFallback();
   } catch (e) {
-    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+    return randFallback();
   }
 }
 
