@@ -111,6 +111,24 @@ function saveDb() {
 
 // ---- API Routes ----
 
+// GET /api/debt - fetch live national debt from Treasury fiscal data API
+app.get('/api/debt', async (req, res) => {
+  try {
+    const resp = await fetch(
+      'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/debt_to_penny?sort=-record_calendar_year,-record_calendar_month&limit=1'
+    );
+    const data = await resp.json();
+    const record = data?.data?.[0];
+    if (!record?.tot_pub_debt_out_amt) throw new Error('Missing field');
+    res.json({
+      amount: parseFloat(record.tot_pub_debt_out_amt),
+      date: record.record_date,
+    });
+  } catch (e) {
+    res.status(502).json({ error: 'Unable to fetch debt data' });
+  }
+});
+
 // GET /api/feed - recent donations
 app.get('/api/feed', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 50, 100);

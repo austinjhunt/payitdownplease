@@ -569,8 +569,8 @@ textarea.field {
   <p class="tagline">The U.S. Treasury now accepts Venmo. We're in great hands.</p>
   <div class="counter-box">
     <div class="counter-label">U.S. National Debt (Real. Unfortunately.)</div>
-    <div id="debt-display">$36,200,000,000,000</div>
-    <div class="counter-sub">+$3,860/sec · ~$334B/day · Your share: ~$104,000</div>
+    <div id="debt-display">$39,000,000,000,000</div>
+    <div class="counter-sub">+$3,860/sec · ~$334B/day · Your share: ~$117,000</div>
   </div>
 </div>
 
@@ -649,14 +649,15 @@ textarea.field {
 <div class="footer" style="border-left:1px solid var(--border);border-right:1px solid var(--border);">
   This is a satirical simulation. No real money is transferred.<br>
   The actual U.S. Treasury does accept debt donations at <a href="https://www.pay.gov" target="_blank">pay.gov</a>.<br>
-  Cumulative gov donations since 1996: ~$67M total. The debt is $36T. Math is hard.<br>
+  Cumulative gov donations since 1996: ~$67M total. The debt is ~$39T and counting. Math is hard.<br>
   Source: <a href="https://github.com/austinjhunt/payitdownplease" target="_blank">github.com/austinjhunt/payitdownplease</a>
 </div>
 
 <script>
 // ── CONFIG ──
-const DEBT_BASE = 36200000000000;
+const DEBT_FALLBACK = 39000000000000;
 const RATE_PER_SEC = 3860;
+let DEBT_BASE = DEBT_FALLBACK;
 const NAMES = ['GaryFromOhio','TaxpayerAnon','PatriotMike88','JennyWhoVoted','AnonymousSad',
   'FreedomEagle69','DebtSlayer420','ConcernedCitizen','JustADad2026','SorryForThis',
   'FiscallyFuming','BigGovHater99','LibertyChadUS','SleepyTaxpayer','UnemployedRN',
@@ -692,7 +693,25 @@ function tick() {
   }
   requestAnimationFrame(tick);
 }
-tick();
+
+async function initDebt() {
+  try {
+    const resp = await fetch('/api/debt');
+    if (!resp.ok) throw new Error();
+    const data = await resp.json();
+    if (data.amount) {
+      DEBT_BASE = data.amount;
+      // Reset pageStart so the ticker counts up from the real figure
+      pageStart = Date.now();
+    }
+  } catch (e) {
+    // silently fall back to hardcoded value
+  }
+  tick();
+}
+initDebt();
+
+"https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/debt_to_penny?fields=record_calendar_year,record_calendar_month&sort=-record_calendar_year,-record_calendar_month"
 
 // ── FORMAT ──
 function fmt(n) { return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:0,maximumFractionDigits:2}); }
