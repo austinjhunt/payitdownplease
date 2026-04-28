@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pay It Down Please | Donate to the National Debt</title>
+<meta name="description" content="The U.S. Treasury accepts Venmo donations toward the $36 trillion national debt. We made a simulator. It's fine.">
+<meta property="og:title" content="Pay It Down Please 🦅">
+<meta property="og:description" content="The debt is $36 trillion. Venmo is accepted. This is fine.">
+<meta property="og:url" content="https://payitdownplease.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green: #4ade80;
+  --green-dim: #16a34a;
+  --green-bg: #0d2b1a;
+  --red: #f87171;
+  --amber: #fbbf24;
+  --cyan: #22d3ee;
+  --bg: #080808;
+  --bg2: #111111;
+  --bg3: #1a1a1a;
+  --border: #222;
+  --border2: #2a2a2a;
+  --text: #e8e0cc;
+  --text2: #888;
+  --text3: #444;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', sans-serif;
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* SCANLINE OVERLAY */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,80,0.012) 2px, rgba(0,255,80,0.012) 4px);
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* ── HERO ── */
+.hero {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 2.5rem 1.5rem 2rem;
+  text-align: center;
+  position: relative;
+}
+
+.seal {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: var(--bg2);
+  border: 2px solid var(--green);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1rem;
+  font-size: 32px;
+  animation: sealPulse 4s ease-in-out infinite;
+}
+
+@keyframes sealPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0.0); }
+  50% { box-shadow: 0 0 0 8px rgba(74,222,128,0.12); }
+}
+
+.gov-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.28em;
+  color: var(--green);
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+h1 {
+  font-family: 'Bebas Neue', serif;
+  font-size: clamp(3rem, 12vw, 6rem);
+  letter-spacing: 0.06em;
+  color: #f5f0e0;
+  line-height: 0.95;
+  margin-bottom: 0.4rem;
+}
+
+.tagline {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text2);
+  letter-spacing: 0.12em;
+  margin-bottom: 1.5rem;
+  font-style: italic;
+}
+
+/* DEBT COUNTER */
+.counter-box {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 1.1rem 2rem;
+  display: inline-block;
+  min-width: min(380px, 90vw);
+  position: relative;
+  overflow: hidden;
+}
+
+.counter-box::before {
+  content: 'LIVE';
+  position: absolute;
+  top: 8px; right: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  color: var(--red);
+  animation: blink 1.4s step-start infinite;
+}
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+.counter-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.22em;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+#debt-display {
+  font-family: 'Bebas Neue', serif;
+  font-size: clamp(2rem, 7vw, 3.6rem);
+  letter-spacing: 0.02em;
+  color: var(--red);
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+#debt-display.flash { color: var(--amber); }
+
+.counter-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--text3);
+  margin-top: 0.35rem;
+  letter-spacing: 0.08em;
+}
+
+/* PROGRESS BAR */
+.progress-track {
+  height: 3px;
+  background: var(--bg3);
+  position: relative;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--cyan));
+  width: 0%;
+  transition: width 0.8s cubic-bezier(.22,.68,0,1.2);
+}
+
+/* STATS BAR */
+.stats-bar {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  align-items: center;
+  padding: 0.7rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  background: var(--bg);
+}
+
+.stat {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  display: flex;
+  gap: 0.4rem;
+}
+.stat em { color: var(--green); font-style: normal; font-weight: 600; }
+
+/* MAIN GRID */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 1fr 320px;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  min-height: calc(100vh - 320px);
+}
+
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr 1fr; }
+  .leaderboard-col { display: none; }
+}
+@media (max-width: 580px) {
+  .main { grid-template-columns: 1fr; }
+  .feed-col { border-top: 1px solid var(--border); }
+}
+
+/* PANELS */
+.col {
+  padding: 1.5rem;
+  border-right: 1px solid var(--border);
+}
+.col:last-child { border-right: none; }
+
+.col-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  color: var(--green);
+  text-transform: uppercase;
+  margin-bottom: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.col-title::before { content: '▶'; font-size: 0.45rem; }
+
+/* DONATION FORM */
+.amount-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.amt-btn {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  color: #aaa;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  padding: 0.55rem 0.3rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+.amt-btn:hover { border-color: var(--green); color: var(--green); }
+.amt-btn.active { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 0.9rem;
+}
+
+.prefix {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--text3);
+}
+
+.field {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field:focus { border-color: var(--green); }
+.field::placeholder { color: var(--text3); font-style: italic; }
+
+textarea.field {
+  height: 70px;
+  resize: none;
+  margin-bottom: 0.9rem;
+}
+
+.name-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--text3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+
+.donate-btn {
+  width: 100%;
+  background: var(--green);
+  color: #080808;
+  border: none;
+  font-family: 'Bebas Neue', serif;
+  font-size: 1.5rem;
+  letter-spacing: 0.14em;
+  padding: 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.donate-btn:hover { background: #86efac; }
+.donate-btn:active { transform: scale(0.98); }
+.donate-btn:disabled { background: #1a3a2a; color: #2a5a3a; cursor: not-allowed; transform: none; }
+
+.impact {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--text3);
+  text-align: center;
+  letter-spacing: 0.06em;
+  font-style: italic;
+  min-height: 1.5em;
+  transition: color 0.3s;
+}
+.impact.active { color: var(--green); }
+
+.share-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 0.9rem;
+}
+
+.share-btn {
+  flex: 1;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  padding: 0.5rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  transition: all 0.15s;
+  text-align: center;
+}
+.share-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* FEED */
+.feed-scroll {
+  height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+
+.feed-item {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+  padding: 0.6rem 0.8rem;
+  animation: slideIn 0.25s ease;
+  flex-shrink: 0;
+}
+.feed-item.fresh { border-left-color: var(--green); }
+.feed-item.loading { opacity: 0.5; }
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.feed-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.feed-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--text2);
+  letter-spacing: 0.05em;
+}
+
+.feed-amount {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--green);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.feed-memo {
+  font-size: 0.83rem;
+  color: #ddd;
+  line-height: 1.4;
+}
+
+.feed-time {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--text3);
+  margin-top: 0.25rem;
+  letter-spacing: 0.06em;
+}
+
+.feed-empty {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text3);
+  text-align: center;
+  padding: 2rem 1rem;
+  font-style: italic;
+}
+
+/* LEADERBOARD */
+.lb-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.lb-item:last-child { border-bottom: none; }
+
+.lb-rank {
+  font-family: 'Bebas Neue', serif;
+  font-size: 1.2rem;
+  color: var(--text3);
+  width: 22px;
+  flex-shrink: 0;
+}
+.lb-rank.gold { color: #fbbf24; }
+.lb-rank.silver { color: #94a3b8; }
+.lb-rank.bronze { color: #b45309; }
+
+.lb-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text2);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-amount {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--green);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lb-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--text3);
+  white-space: nowrap;
+}
+
+/* FOOTER */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--text3);
+  text-align: center;
+  line-height: 2;
+  letter-spacing: 0.06em;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.footer a { color: var(--text3); text-decoration: underline; }
+
+/* CONFETTI */
+#confetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+.piece {
+  position: absolute;
+  width: 7px; height: 7px;
+  animation: fall linear forwards;
+}
+@keyframes fall {
+  from { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  to { transform: translateY(105vh) rotate(540deg); opacity: 0; }
+}
+
+/* TOAST */
+#toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--bg2);
+  border: 1px solid var(--green);
+  color: var(--green);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  padding: 0.7rem 1.5rem;
+  border-radius: 4px;
+  letter-spacing: 0.1em;
+  transition: transform 0.3s ease;
+  z-index: 9999;
+  white-space: nowrap;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div id="confetti"></div>
+<div id="toast">Copied to clipboard!</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="seal">🦅</div>
+  <div class="gov-label">Official™ Unofficial Patriot Debt Repayment Portal</div>
+  <h1>PAY IT DOWN<br>PLEASE</h1>
+  <p class="tagline">The U.S. Treasury now accepts Venmo. We're in great hands.</p>
+  <div class="counter-box">
+    <div class="counter-label">U.S. National Debt (Real. Unfortunately.)</div>
+    <div id="debt-display">$36,200,000,000,000</div>
+    <div class="counter-sub">+$3,860/sec · ~$334B/day · Your share: ~$104,000</div>
+  </div>
+</div>
+
+<div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+
+<div class="stats-bar">
+  <div class="stat">Your session: <em id="s-session">$0.00</em></div>
+  <div class="stat">All-time (this app): <em id="s-alltime">$0.00</em></div>
+  <div class="stat">Total donations: <em id="s-count">0</em></div>
+  <div class="stat">Debt paid off: <em id="s-pct">0.0000000000%</em></div>
+  <div class="stat">Debt added since page load: <em id="s-added">+$0</em></div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- DONATION COL -->
+  <div class="col">
+    <div class="col-title">Make Your Meaningless Contribution</div>
+
+    <div class="amount-grid">
+      <button class="amt-btn" data-amount="5">$5</button>
+      <button class="amt-btn" data-amount="20">$20</button>
+      <button class="amt-btn" data-amount="100">$100</button>
+      <button class="amt-btn" data-amount="420">$420</button>
+      <button class="amt-btn" data-amount="1000">$1,000</button>
+      <button class="amt-btn" data-amount="69420">$69,420</button>
+    </div>
+
+    <div class="input-row">
+      <span class="prefix">$</span>
+      <input class="field" id="custom-amt" type="number" placeholder="Custom amount" min="0.01" step="0.01">
+    </div>
+
+    <div class="name-label">Your Venmo Handle</div>
+    <input class="field" id="donor-name" placeholder="GaryFromOhio" style="margin-bottom:0.9rem;" maxlength="32">
+
+    <div class="name-label">Memo (optional — leave blank for AI chaos)</div>
+    <textarea class="field" id="memo" placeholder="what's this for..."></textarea>
+
+    <button class="donate-btn" id="donate-btn">🦅 Donate to America</button>
+
+    <div class="impact" id="impact">Every dollar counts. Technically.</div>
+
+    <div class="share-row">
+      <button class="share-btn" id="share-x">Share on 𝕏</button>
+      <button class="share-btn" id="share-copy">Copy Link</button>
+    </div>
+  </div>
+
+  <!-- FEED COL -->
+  <div class="col feed-col">
+    <div class="col-title">Patriot Activity Feed</div>
+    <div class="feed-scroll" id="feed">
+      <div class="feed-empty">Loading patriot activity...</div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="col leaderboard-col">
+    <div class="col-title">Hall of Patriots</div>
+    <div id="leaderboard">
+      <div class="feed-empty">Loading heroes...</div>
+    </div>
+    <div style="margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1rem;">
+      <div class="name-label" style="margin-bottom:0.5rem;">Fun Facts</div>
+      <div id="funfacts" style="font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--text3);line-height:2;"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer" style="border-left:1px solid var(--border);border-right:1px solid var(--border);">
+  This is a satirical simulation. No real money is transferred.<br>
+  The actual U.S. Treasury does accept debt donations at <a href="https://www.pay.gov" target="_blank">pay.gov</a>.<br>
+  Cumulative gov donations since 1996: ~$67M total. The debt is $36T. Math is hard.<br>
+  Source: <a href="https://github.com/austinjhunt/payitdownplease" target="_blank">github.com/austinjhunt/payitdownplease</a>
+</div>
+
+<script>
+// ── CONFIG ──
+const DEBT_BASE = 36200000000000;
+const RATE_PER_SEC = 3860;
+const NAMES = ['GaryFromOhio','TaxpayerAnon','PatriotMike88','JennyWhoVoted','AnonymousSad',
+  'FreedomEagle69','DebtSlayer420','ConcernedCitizen','JustADad2026','SorryForThis',
+  'FiscallyFuming','BigGovHater99','LibertyChadUS','SleepyTaxpayer','UnemployedRN',
+  'RetiredBoomer','PissedOffIRS','DefinitelyNotABot','RandPaulFan','BrokePatriot'];
+const IMPACTS = [
+  n => `Your $${fmt(n)} covers ${(n/3860).toFixed(4)} seconds of debt growth. Progress!`,
+  n => `The debt grew $${fmt(n*3.1)} while you filled out this form. So that's fun.`,
+  n => `${((n/DEBT_BASE)*100).toExponential(3)}% of the debt. Nobel Prize incoming.`,
+  n => `Congress will spend $${fmt(n*847)} before you finish reading this.`,
+  n => `At this rate you'll pay it off in ${(DEBT_BASE/n/12/365).toExponential(1)} years. Totally doable.`,
+  n => `You just covered ${(n/88000000000*86400).toFixed(6)} seconds of daily interest. Hero.`,
+];
+
+// ── STATE ──
+let pageStart = Date.now();
+let selectedAmt = null;
+let sessionTotal = 0;
+let allTimeTotal = 0;
+let allTimeCount = 0;
+let isSubmitting = false;
+let lastShareText = '';
+
+// ── DEBT COUNTER ──
+const debtEl = document.getElementById('debt-display');
+function tick() {
+  const elapsed = (Date.now() - pageStart) / 1000;
+  const debt = DEBT_BASE + elapsed * RATE_PER_SEC;
+  debtEl.textContent = '$' + Math.round(debt).toLocaleString('en-US');
+  document.getElementById('s-added').textContent = '+$' + Math.round(elapsed * RATE_PER_SEC).toLocaleString();
+  if (allTimeTotal > 0) {
+    const pct = (allTimeTotal / debt * 100).toFixed(12);
+    document.getElementById('s-pct').textContent = pct + '%';
+  }
+  requestAnimationFrame(tick);
+}
+tick();
+
+// ── FORMAT ──
+function fmt(n) { return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:0,maximumFractionDigits:2}); }
+function timeAgo(ts) {
+  const sec = Math.floor((Date.now() - ts) / 1000);
+  if (sec < 5) return 'just now';
+  if (sec < 60) return sec + 's ago';
+  if (sec < 3600) return Math.floor(sec/60) + 'm ago';
+  return Math.floor(sec/3600) + 'h ago';
+}
+
+// ── AMOUNT SELECTION ──
+document.querySelectorAll('.amt-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.amt-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedAmt = parseFloat(btn.dataset.amount);
+    document.getElementById('custom-amt').value = '';
+  });
+});
+document.getElementById('custom-amt').addEventListener('input', () => {
+  document.querySelectorAll('.amt-btn').forEach(b => b.classList.remove('active'));
+  selectedAmt = null;
+});
+
+// ── DONATE ──
+document.getElementById('donate-btn').addEventListener('click', async () => {
+  if (isSubmitting) return;
+  const customVal = parseFloat(document.getElementById('custom-amt').value);
+  const amount = selectedAmt || customVal;
+  if (!amount || amount <= 0) {
+    showImpact('⚠ Pick an amount, patriot.', false);
+    return;
+  }
+  const rawName = document.getElementById('donor-name').value.trim();
+  const name = rawName || NAMES[Math.floor(Math.random() * NAMES.length)];
+  const memo = document.getElementById('memo').value.trim();
+
+  isSubmitting = true;
+  const btn = document.getElementById('donate-btn');
+  btn.disabled = true;
+  btn.textContent = '🌀 Processing your sacrifice...';
+
+  try {
+    const resp = await fetch('/api/donate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, amount, memo })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error);
+
+    sessionTotal += amount;
+    allTimeTotal += amount;
+    allTimeCount++;
+    document.getElementById('s-session').textContent = fmt(sessionTotal);
+    document.getElementById('s-alltime').textContent = fmt(allTimeTotal);
+    document.getElementById('s-count').textContent = allTimeCount.toLocaleString();
+
+    const pctNum = Math.min((sessionTotal / 1000000) * 100, 100);
+    document.getElementById('progress').style.width = pctNum + '%';
+
+    flashDebt();
+    spawnConfetti(amount);
+    const fn = IMPACTS[Math.floor(Math.random() * IMPACTS.length)];
+    showImpact(fn(amount), true);
+
+    const donation = data.donation;
+    prependFeedItem(donation, true);
+
+    // build share text for this donation
+    lastShareText = `I just donated ${fmt(amount)} to the U.S. national debt 🦅 That's ${((amount/DEBT_BASE)*100).toExponential(2)}% paid off. Who's next? payitdownplease.com`;
+
+    document.getElementById('memo').value = '';
+    playDonate();
+    loadLeaderboard();
+  } catch (e) {
+    showImpact('⚠ Something broke. The debt lives on.', false);
+  } finally {
+    isSubmitting = false;
+    btn.disabled = false;
+    btn.textContent = '🦅 Donate Again';
+  }
+});
+
+// ── FLASH DEBT ──
+function flashDebt() {
+  debtEl.classList.add('flash');
+  setTimeout(() => debtEl.classList.remove('flash'), 350);
+}
+
+// ── IMPACT MESSAGE ──
+function showImpact(msg, good) {
+  const el = document.getElementById('impact');
+  el.textContent = msg;
+  el.classList.toggle('active', good);
+  if (good) setTimeout(() => el.classList.remove('active'), 4000);
+}
+
+// ── CONFETTI ──
+function spawnConfetti(amount) {
+  const colors = ['#4ade80','#22d3ee','#fbbf24','#f87171','#a78bfa','#fb923c'];
+  const count = Math.min(25 + Math.floor(Math.log10(amount+1)*12), 70);
+  const container = document.getElementById('confetti');
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'piece';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.borderRadius = Math.random() > 0.5 ? '50%' : '1px';
+    p.style.animationDuration = (1.2 + Math.random() * 2.5) + 's';
+    p.style.animationDelay = (Math.random() * 0.6) + 's';
+    container.appendChild(p);
+    setTimeout(() => p.remove(), 4000);
+  }
+}
+
+// ── AUDIO ──
+function playDonate() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.3);
+      osc.start(ctx.currentTime + i * 0.08);
+      osc.stop(ctx.currentTime + i * 0.08 + 0.35);
+    });
+  } catch(e) {}
+}
+
+// ── FEED ──
+function prependFeedItem(donation, fresh) {
+  const feed = document.getElementById('feed');
+  const empty = feed.querySelector('.feed-empty');
+  if (empty) empty.remove();
+
+  const item = document.createElement('div');
+  item.className = 'feed-item' + (fresh ? ' fresh' : '');
+  const ts = donation.created_at > 1e12 ? donation.created_at : donation.created_at * 1000;
+  item.innerHTML = `
+    <div class="feed-top">
+      <span class="feed-name">@${donation.name}</span>
+      <span class="feed-amount">+${fmt(donation.amount)}</span>
+    </div>
+    <div class="feed-memo">${escHtml(donation.memo)}</div>
+    <div class="feed-time">${timeAgo(ts)}</div>
+  `;
+  feed.insertBefore(item, feed.firstChild);
+  while (feed.children.length > 50) feed.removeChild(feed.lastChild);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function loadFeed() {
+  try {
+    const resp = await fetch('/api/feed?limit=30');
+    const data = await resp.json();
+    const feed = document.getElementById('feed');
+    feed.innerHTML = '';
+    if (!data.donations.length) {
+      feed.innerHTML = '<div class="feed-empty">No patriots yet. Be first.</div>';
+      return;
+    }
+    data.donations.forEach(d => prependFeedItem(d, false));
+    // Reverse so newest is on top after bulk insert
+    const items = Array.from(feed.children);
+    feed.innerHTML = '';
+    items.reverse().forEach(i => feed.appendChild(i));
+  } catch(e) {
+    document.getElementById('feed').innerHTML = '<div class="feed-empty">Feed unavailable.</div>';
+  }
+}
+
+// ── LEADERBOARD ──
+async function loadLeaderboard() {
+  try {
+    const resp = await fetch('/api/leaderboard');
+    const data = await resp.json();
+    const lb = document.getElementById('leaderboard');
+    if (!data.leaderboard.length) {
+      lb.innerHTML = '<div class="feed-empty">No heroes yet.</div>';
+      return;
+    }
+    const rankClass = i => i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    lb.innerHTML = data.leaderboard.map((r, i) => `
+      <div class="lb-item">
+        <span class="lb-rank ${rankClass(i)}">${i+1}</span>
+        <span class="lb-name">@${escHtml(r.name)}</span>
+        <span class="lb-count">${r.count}x</span>
+        <span class="lb-amount">${fmt(r.total)}</span>
+      </div>
+    `).join('');
+  } catch(e) {}
+}
+
+// ── STATS ──
+async function loadStats() {
+  try {
+    const resp = await fetch('/api/stats');
+    const data = await resp.json();
+    allTimeTotal = parseFloat(data.total) || 0;
+    allTimeCount = parseInt(data.count) || 0;
+    document.getElementById('s-alltime').textContent = fmt(allTimeTotal);
+    document.getElementById('s-count').textContent = allTimeCount.toLocaleString();
+  } catch(e) {}
+}
+
+// ── FUN FACTS ──
+function updateFunFacts() {
+  const debt = DEBT_BASE + ((Date.now() - pageStart) / 1000) * RATE_PER_SEC;
+  const facts = [
+    `Gov donations since 1996: ~$67M total`,
+    `That's ${((67000000/debt)*100).toExponential(2)}% of the debt`,
+    `Monthly interest alone: ~$88B`,
+    `$67M vs $88B interest = 🙃`,
+    `Each American owes: ~$104,000`,
+    `Debt grows ~$5.1T/year`,
+  ];
+  document.getElementById('funfacts').innerHTML = facts.map(f => '→ ' + f).join('<br>');
+}
+updateFunFacts();
+
+// ── SHARE ──
+document.getElementById('share-x').addEventListener('click', () => {
+  const text = lastShareText || `The U.S. Treasury accepts Venmo donations toward the $36 trillion national debt. This is a real thing. I'm not okay. payitdownplease.com`;
+  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+});
+
+document.getElementById('share-copy').addEventListener('click', () => {
+  navigator.clipboard.writeText(window.location.href).then(() => showToast('Link copied!')).catch(() => {});
+});
+
+// ── TOAST ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── INIT ──
+loadFeed();
+loadStats();
+loadLeaderboard();
+
+// Poll feed every 10s for new donations from other users
+setInterval(loadFeed, 10000);
+setInterval(loadLeaderboard, 15000);
+setInterval(loadStats, 15000);
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "name": "payitdownplease",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/austinjhunt/payitdownplease.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/austinjhunt/payitdownplease/issues"
+  },
+  "homepage": "https://github.com/austinjhunt/payitdownplease#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "sql.js": "^1.14.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
