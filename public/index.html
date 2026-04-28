@@ -713,7 +713,10 @@ document.getElementById('donate-btn').addEventListener('click', async () => {
       body: JSON.stringify({ name, amount, memo })
     });
     const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error);
+    if (!resp.ok) {
+      showImpact('⚠ ' + (data.error || 'Submission failed.'), false);
+      return;
+    }
 
     sessionTotal += amount;
     allTimeTotal += amount;

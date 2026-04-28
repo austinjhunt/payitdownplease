@@ -15,6 +15,53 @@ const FALLBACKS = require('fs')
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'donations.db');
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+
+// ---- Rate limiting (in-memory, 10 donations per IP per day) ----
+const rateLimitMap = new Map(); // ip -> { count, resetAt }
+const RATE_LIMIT = 10;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 86400000 });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
+// ---- Input validation ----
+const { RegExpMatcher, englishDataset, englishRecommendedTransformers } = require('obscenity');
+
+const XSS_PATTERN = /<[^>]*>|javascript:|data:|on\w+\s*=/i;
+const DANGEROUS_PATTERN = /(\bexec\b|\beval\b|<script|<\/script|union\s+select|drop\s+table)/i;
+
+const profanityMatcher = new RegExpMatcher({
+  ...englishDataset.build(),
+  ...englishRecommendedTransformers,
+});
+
+function validateText(str) {
+  if (XSS_PATTERN.test(str)) return 'Input contains disallowed HTML or script content';
+  if (DANGEROUS_PATTERN.test(str)) return 'Input contains disallowed content';
+  if (profanityMatcher.hasMatch(str)) return 'Message contains profanity';
+  return null;
+}
+
+// ---- Admin auth middleware ----
+function requireAdmin(req, res, next) {
+  if (!ADMIN_TOKEN) {
+    return res.status(503).json({ error: 'Admin access not configured (set ADMIN_TOKEN in .env)' });
+  }
+  const token = req.headers['x-admin-token'] || (req.headers['authorization'] || '').replace('Bearer ', '');
+  if (token !== ADMIN_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
 
 app.use(cors());
 app.use(express.json());
@@ -105,6 +152,28 @@ app.post('/api/donate', async (req, res) => {
     return res.status(400).json({ error: 'Invalid donation data' });
   }
 
+  // Validate name
+  if (typeof name !== 'string' || name.length > 32) {
+    return res.status(400).json({ error: 'Name must be 32 characters or fewer' });
+  }
+  const nameErr = validateText(name);
+  if (nameErr) return res.status(400).json({ error: nameErr });
+
+  // Validate memo if provided
+  if (memo && typeof memo === 'string') {
+    if (memo.length > 280) {
+      return res.status(400).json({ error: 'Memo must be 280 characters or fewer' });
+    }
+    const memoErr = validateText(memo);
+    if (memoErr) return res.status(400).json({ error: memoErr });
+  }
+
+  // Rate limit by IP
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ error: 'Rate limit exceeded — max 10 donations per day' });
+  }
+
   let finalMemo = memo;
 
   // Generate AI memo if none provided
@@ -166,6 +235,68 @@ async function generateMemo(amount) {
     return randFallback();
   }
 }
+
+// ---- Admin Routes ----
+
+// GET /api/admin/donations - paginated list for admin panel
+app.get('/api/admin/donations', requireAdmin, (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+  const offset = parseInt(req.query.offset) || 0;
+  const stmt = db.prepare(
+    'SELECT * FROM donations ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  );
+  const rows = [];
+  stmt.bind([limit, offset]);
+  while (stmt.step()) rows.push(stmt.getAsObject());
+  stmt.free();
+
+  const countStmt = db.prepare('SELECT COUNT(*) as total FROM donations');
+  countStmt.step();
+  const { total } = countStmt.getAsObject();
+  countStmt.free();
+
+  res.json({ donations: rows, total });
+});
+
+// DELETE /api/admin/donations/:id
+app.delete('/api/admin/donations/:id', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id || isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
+
+  // Get the donation before deleting so we can update leaderboard
+  const selectStmt = db.prepare('SELECT * FROM donations WHERE id = ?');
+  selectStmt.bind([id]);
+  let donation = null;
+  if (selectStmt.step()) donation = selectStmt.getAsObject();
+  selectStmt.free();
+
+  if (!donation) return res.status(404).json({ error: 'Donation not found' });
+
+  db.run('DELETE FROM donations WHERE id = ?', [id]);
+
+  // Recalculate leaderboard entry for this donor
+  const recalcStmt = db.prepare(
+    'SELECT COALESCE(SUM(amount),0) as total, COUNT(*) as count FROM donations WHERE name = ?'
+  );
+  recalcStmt.bind([donation.name]);
+  recalcStmt.step();
+  const { total, count } = recalcStmt.getAsObject();
+  recalcStmt.free();
+
+  if (count === 0) {
+    db.run('DELETE FROM leaderboard WHERE name = ?', [donation.name]);
+  } else {
+    db.run('UPDATE leaderboard SET total = ?, count = ? WHERE name = ?', [total, count, donation.name]);
+  }
+
+  saveDb();
+  res.json({ success: true });
+});
+
+// Serve admin page
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 
 // Serve frontend for all other routes
 app.get('/{*path}', (req, res) => {
